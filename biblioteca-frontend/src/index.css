@@ -1,0 +1,34 @@
+:root{
+  --bg: #f6f8fb;
+  --primary: #0d6efd;
+  --muted: #6c757d;
+  --card: #ffffff;
+  --accent: #6610f2;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: var(--bg);
+  color:#212529;
+}
+
+.container{max-width:1000px}
+
+.card{background:var(--card);border-radius:8px;box-shadow:0 6px 18px rgba(19,24,31,0.06)}
+
+.auth-card{max-width:420px;padding:22px;margin-top:50px}
+
+.multas-item{padding:12px;border-bottom:1px solid rgba(0,0,0,0.04)}
+
+.btn-primary{background:var(--primary);border-color:var(--primary)}
+
+.navbar-brand{letter-spacing:0.2px}
+
+/* small helpers */
+.text-muted{color:var(--muted)}
+
+@media (max-width:576px){
+  .auth-card{margin:20px}
+}
