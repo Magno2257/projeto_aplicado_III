@@ -68,10 +68,10 @@ module.exports = (pool) => {
     }
   });
 
-  // Criar novo usuário
+  // Criar novo usuário (aceita senha opcional)
   router.post('/', async (req, res) => {
     try {
-      const { nome_completo, cpf, telefone, email, endereco, tipo_usuario } = req.body;
+      const { nome_completo, cpf, telefone, email, endereco, tipo_usuario, senha } = req.body;
 
       // Validação
       if (!nome_completo || !cpf || !email || !tipo_usuario) {
@@ -86,9 +86,18 @@ module.exports = (pool) => {
         return res.status(400).json({ error: 'CPF inválido' });
       }
 
+      // Hash da senha (se fornecida)
+      let senhaHash = null;
+      if (senha) {
+        const crypto = require('crypto');
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = crypto.pbkdf2Sync(senha, salt, 310000, 32, 'sha256').toString('hex');
+        senhaHash = `${salt}$${hash}`;
+      }
+
       const [result] = await pool.query(
-        'INSERT INTO usuarios (nome_completo, cpf, telefone, email, endereco, tipo_usuario) VALUES (?, ?, ?, ?, ?, ?)',
-        [nome_completo, cpf, telefone, email, endereco, tipo_usuario]
+        'INSERT INTO usuarios (nome_completo, cpf, telefone, email, endereco, tipo_usuario, senha) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [nome_completo, cpf, telefone, email, endereco, tipo_usuario, senhaHash]
       );
 
       res.status(201).json({ id: result.insertId });
@@ -98,10 +107,10 @@ module.exports = (pool) => {
     }
   });
 
-  // Atualizar usuário
+  // Atualizar usuário (aceita alteração de senha)
   router.put('/:id', async (req, res) => {
     try {
-      const { nome_completo, cpf, telefone, email, endereco, tipo_usuario } = req.body;
+      const { nome_completo, cpf, telefone, email, endereco, tipo_usuario, senha } = req.body;
 
       // Validação
       if (!nome_completo || !cpf || !email || !tipo_usuario) {
@@ -116,10 +125,28 @@ module.exports = (pool) => {
         return res.status(400).json({ error: 'CPF inválido' });
       }
 
-      const [result] = await pool.query(
-        'UPDATE usuarios SET nome_completo = ?, cpf = ?, telefone = ?, email = ?, endereco = ?, tipo_usuario = ? WHERE id_usuario = ?',
-        [nome_completo, cpf, telefone, email, endereco, tipo_usuario, req.params.id]
-      );
+      // Se senha fornecida, gerar hash
+      let senhaHash = null;
+      if (senha) {
+        const crypto = require('crypto');
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = crypto.pbkdf2Sync(senha, salt, 310000, 32, 'sha256').toString('hex');
+        senhaHash = `${salt}$${hash}`;
+      }
+
+      // Montar query dependendo se atualiza senha
+      let result;
+      if (senhaHash) {
+        [result] = await pool.query(
+          'UPDATE usuarios SET nome_completo = ?, cpf = ?, telefone = ?, email = ?, endereco = ?, tipo_usuario = ?, senha = ? WHERE id_usuario = ?',
+          [nome_completo, cpf, telefone, email, endereco, tipo_usuario, senhaHash, req.params.id]
+        );
+      } else {
+        [result] = await pool.query(
+          'UPDATE usuarios SET nome_completo = ?, cpf = ?, telefone = ?, email = ?, endereco = ?, tipo_usuario = ? WHERE id_usuario = ?',
+          [nome_completo, cpf, telefone, email, endereco, tipo_usuario, req.params.id]
+        );
+      }
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Usuário não encontrado' });

@@ -16,18 +16,21 @@ function App() {
     <Router>
       <Navbar />
       <Routes>
+        {/* Rotas públicas */}
         <Route path="/" element={<Login />} />
-        <Route path="/usuarios" element={<Usuarios />} />
-        <Route path="/usuarios/cadastro" element={<UsuarioCadastro />} />
-        <Route path="/usuarios/cadastro/:id" element={<UsuarioCadastro />} />
-        <Route path="/livros" element={<Livros />} />
-        <Route path="/livros/cadastro" element={<LivroCadastro />} />
-        <Route path="/livros/cadastro/:id" element={<LivroCadastro />} />
-        <Route path="/emprestimos" element={<Emprestimos />} />
-        <Route path="/emprestimos/cadastro" element={<EmprestimoCadastro />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/relatorios" element={<Relatorios />} />
-        <Route path="/multas" element={<Multas />} />
+        <Route path="/usuarios/cadastro" element={<UsuarioCadastro />} />
+
+        {/* Rotas protegidas - requerem login */}
+        <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
+        <Route path="/usuarios/cadastro/:id" element={<ProtectedRoute><UsuarioCadastro /></ProtectedRoute>} />
+        <Route path="/livros" element={<ProtectedRoute><Livros /></ProtectedRoute>} />
+        <Route path="/livros/cadastro" element={<ProtectedRoute><LivroCadastro /></ProtectedRoute>} />
+        <Route path="/livros/cadastro/:id" element={<ProtectedRoute><LivroCadastro /></ProtectedRoute>} />
+        <Route path="/emprestimos" element={<ProtectedRoute><Emprestimos /></ProtectedRoute>} />
+        <Route path="/emprestimos/cadastro" element={<ProtectedRoute><EmprestimoCadastro /></ProtectedRoute>} />
+        <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
+        <Route path="/multas" element={<ProtectedRoute><Multas /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

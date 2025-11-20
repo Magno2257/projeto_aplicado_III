@@ -11,6 +11,7 @@ export default function UsuarioCadastro() {
     email: '',
     endereco: '',
     tipo_usuario: 'aluno',
+    senha: '',
   });
 
   const navigate = useNavigate();
@@ -78,11 +79,21 @@ export default function UsuarioCadastro() {
       setEmailError('E-mail inválido');
       hasError = true;
     }
+    // Validar senha no cadastro
+    if (!id) {
+      if (!formData.senha || formData.senha.length < 6) {
+        alert('Senha é obrigatória e deve ter ao menos 6 caracteres');
+        return;
+      }
+    }
     if (hasError) return;
 
     try {
       if (id) {
-        await api.put(`/usuarios/${id}`, formData);
+        // não enviar senha vazia ao atualizar
+        const payload = { ...formData };
+        if (!payload.senha) delete payload.senha;
+        await api.put(`/usuarios/${id}`, payload);
         alert('Usuário atualizado com sucesso!');
       } else {
         await api.post('/usuarios', formData);
@@ -146,6 +157,19 @@ export default function UsuarioCadastro() {
             required
           />
           <Form.Control.Feedback type="invalid">{emailError}</Form.Control.Feedback>
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Senha</Form.Label>
+          <Form.Control
+            type="password"
+            name="senha"
+            value={formData.senha}
+            onChange={handleChange}
+            placeholder={id ? 'Deixe em branco para manter a senha atual' : ''}
+            minLength={6}
+            required={!id}
+          />
         </Form.Group>
 
         <Form.Group className="mb-3">

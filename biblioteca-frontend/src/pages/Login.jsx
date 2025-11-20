@@ -20,18 +20,31 @@ export default function Login() {
     try {
       // Tenta autenticar no backend
       const res = await api.post('/auth/login', { email, senha });
-      const token = res.data?.token || JSON.stringify({ email });
-      const user = res.data?.user || { email };
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      navigate('/');
-    } catch (err) {
-      const status = err?.response?.status;
-      if (status === 401) {
-        setError('Usuário não cadastrado ou senha incorreta.');
-      } else {
-        setError('Erro ao conectar com o servidor. Tente novamente.');
+      const token = res.data?.token;
+      const user = res.data?.user;
+      if (!token) {
+        setError('Resposta inválida do servidor ao autenticar');
+        return;
       }
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user || { email }));
+      // Após login, ir direto para a lista de livros
+      navigate('/livros');
+    } catch (err) {
+      // Mostrar mensagem do backend quando disponível
+      const status = err?.response?.status;
+      // Prioriza mostrar 'Senha Incorreta' quando o servidor retornar 401
+      if (status === 401) {
+        setError('E-mail ou Senha Incorreta');
+      } else {
+        const serverMsg = err?.response?.data?.error;
+        if (serverMsg) {
+          setError(serverMsg);
+        } else {
+          setError('Erro ao conectar com o servidor. Tente novamente.');
+        }
+      }
+      console.error('Login error:', err?.response || err);
     }
   }
 

@@ -3,11 +3,21 @@ import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   const navigate = useNavigate();
 
   useEffect(() => {
     const raw = localStorage.getItem('user');
     if (raw) setUser(JSON.parse(raw));
+    const t = localStorage.getItem('token');
+    setToken(t);
+
+    function onStorage(e) {
+      if (e.key === 'token') setToken(e.newValue);
+      if (e.key === 'user') setUser(e.newValue ? JSON.parse(e.newValue) : null);
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   function handleLogout() {
@@ -36,30 +46,32 @@ export default function Navbar() {
 
         <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
           <ul className="navbar-nav align-items-center">
-            <li className="nav-item">
-              <Link className="nav-link" to="/usuarios">Usuários</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/livros">Livros</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/emprestimos">Empréstimos</Link>
-            </li>
-
+            {token ? (
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/usuarios">Usuários</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/livros">Livros</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/emprestimos">Empréstimos</Link>
+                </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/relatorios">Relatórios</Link>
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/multas">Multas</Link>
                 </li>
-
-            <li className="nav-item">
-              {user ? (
-                <button className="btn btn-outline-light btn-sm ms-2" onClick={handleLogout}>Sair</button>
-              ) : (
+                <li className="nav-item">
+                  <button className="btn btn-outline-light btn-sm ms-2" onClick={handleLogout}>Sair</button>
+                </li>
+              </>
+            ) : (
+              <li className="nav-item">
                 <Link className="btn btn-light btn-sm ms-2" to="/login">Entrar</Link>
-              )}
-            </li>
+              </li>
+            )}
           </ul>
         </div>
       </div>
