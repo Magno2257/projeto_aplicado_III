@@ -45,6 +45,7 @@ CREATE TABLE
     );
 
 -- Tabela RESERVA -> reservas
+-- As colunas id_usuario e id_livro permanecem NOT NULL, pois a regra CASCADE garante que a linha será deletada.
 CREATE TABLE
     reservas (
         id_reserva int PRIMARY KEY auto_increment,
@@ -56,6 +57,7 @@ CREATE TABLE
     );
 
 -- Tabela EMPRESTIMO -> emprestimos
+-- ALTERADA: id_usuario e id_livro agora permitem NULL para suportar SET NULL.
 CREATE TABLE
     emprestimos (
         id_emprestimo INT AUTO_INCREMENT PRIMARY KEY,
@@ -63,47 +65,69 @@ CREATE TABLE
         data_prevista DATE not null,
         data_devolucao DATE,
         status_devolucao varchar(20) not null default 'ativo',
-        id_usuario int not null,
+        id_usuario int null, -- ALTERADO para NULL
         id_multa int null,
-        id_livro int not null
+        id_livro int null -- ALTERADO para NULL
     );
 
 -- Tabela Relatorios -> relatorios
+-- ALTERADA: id_usuario agora permite NULL para suportar SET NULL.
 CREATE TABLE
     relatorios (
         id_relatorio int PRIMARY KEY auto_increment,
         titulo varchar(200),
         data_geracao date,
         conteudo text,
-        id_usuario int
+        id_usuario int null -- ALTERADO para NULL
     );
 
--- CHAVES ESTRANGEIRAS (com nomes de tabelas em minúsculas)
-ALTER TABLE reservas ADD CONSTRAINT fk_reservas_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- =================================================================================
+-- CHAVES ESTRANGEIRAS (REGRAS DE EXCLUSÃO AJUSTADAS)
+-- =================================================================================
+
+-- 1. RESERVAS: ON DELETE CASCADE (Se o livro/usuário for excluído, a reserva é cancelada/deletada)
+ALTER TABLE reservas ADD CONSTRAINT fk_reservas_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE reservas ADD CONSTRAINT fk_reservas_livro FOREIGN KEY (id_livro) REFERENCES livros (id_livro) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE emprestimos ADD CONSTRAINT fk_emprestimos_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- 2. EMPRESTIMOS: ON DELETE SET NULL (O histórico de empréstimo deve ser mantido, mas o link para o usuário/livro deletado é removido)
+ALTER TABLE emprestimos ADD CONSTRAINT fk_emprestimos_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE emprestimos ADD CONSTRAINT fk_emprestimos_multa FOREIGN KEY (id_multa) REFERENCES multas (id_multa) ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE emprestimos ADD CONSTRAINT fk_emprestimos_livro FOREIGN KEY (id_livro) REFERENCES livros (id_livro) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE emprestimos ADD CONSTRAINT fk_emprestimos_livro FOREIGN KEY (id_livro) REFERENCES livros (id_livro) ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE relatorios ADD CONSTRAINT fk_relatorios_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- 3. RELATORIOS: ON DELETE SET NULL (Relatórios devem ser mantidos mesmo que o usuário seja deletado, mas o link é removido)
+ALTER TABLE relatorios ADD CONSTRAINT fk_relatorios_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE usuarios ADD COLUMN senha VARCHAR(255) NULL;
 
--- Trigger para calcular a data_prevista
-DELIMITER / / CREATE TRIGGER set_data_prevista BEFORE INSERT ON emprestimos FOR EACH ROW BEGIN IF NEW.data_prevista IS NULL THEN
-SET
-    NEW.data_prevista = DATE_ADD (CURRENT_DATE, INTERVAL 10 DAY);
+ALTER TABLE emprestimos ADD COLUMN multa_paga BOOLEAN DEFAULT FALSE;
+ALTER TABLE multas ADD COLUMN id_usuario INT NOT NULL;
+ALTER TABLE multas ADD COLUMN id_emprestimo INT NOT NULL;
 
-END IF;
+-- Adicione as chaves estrangeiras (depois de adicionar as colunas):
+ALTER TABLE multas ADD CONSTRAINT fk_multas_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE multas ADD CONSTRAINT fk_multas_emprestimo FOREIGN KEY (id_emprestimo) REFERENCES emprestimos (id_emprestimo) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE multas ADD COLUMN id_usuario INT NOT NULL, ADD FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario);
 
+
+-- =================================================================================
+-- TRIGGERS E VIEWS (CORRIGIDOS PARA CONSISTÊNCIA)
+-- =================================================================================
+
+-- Trigger para calcular a data_prevista (Mantido)
+DELIMITER // -- Sem espaços entre as barras
+CREATE TRIGGER set_data_prevista BEFORE INSERT ON emprestimos FOR EACH ROW 
+BEGIN 
+    IF NEW.data_prevista IS NULL THEN
+        SET NEW.data_prevista = DATE_ADD (CURRENT_DATE(), INTERVAL 10 DAY);
+    END IF;
 END;
-
-/ / DELIMITER;
+// 
+DELIMITER ;
 
 -- View para informar o status calculado dos empréstimos
-CREATE VIEW
+CREATE OR REPLACE VIEW
     vw_emprestimos AS
 SELECT
     e.id_emprestimo,
@@ -114,65 +138,20 @@ SELECT
     e.data_devolucao,
     CASE
         WHEN e.data_devolucao IS NOT NULL THEN 'devolvido'
-        WHEN CURDATE () > e.data_prevista THEN 'atrasado'
+        WHEN CURDATE() > e.data_prevista THEN 'atrasado' -- CORREÇÃO: Removido o espaço
         ELSE 'emprestado'
     END AS status_calculado
 FROM
     emprestimos e;
 
-CREATE
-OR REPLACE VIEW vw_emprestimos_detalhados AS
-SELECT
+-- View de Detalhes: CORRIGIDA para usar os nomes de colunas corretos (id_usuario, id_livro)
+CREATE OR REPLACE VIEW vw_emprestimos_detalhados AS
+SELECT 
     e.id_emprestimo,
     e.data_emprestimo,
     e.data_prevista,
     e.data_devolucao,
-    u.id_usuario,
-    u.nome_completo,
-    l.id_livro,
-    l.titulo,
-    CASE
-        WHEN e.data_devolucao IS NOT NULL THEN 'devolvido'
-        WHEN CURDATE () > e.data_prevista THEN 'atrasado'
-        ELSE 'emprestado'
-    END AS status_calculado
-FROM
-    emprestimos e
-    JOIN usuarios u ON e.FK_USUARIO_ID_usuario = u.id_usuario
-    JOIN livros l ON e.FK_LIVROS_ID_livro = l.id_livro;
-
-        CREATE OR REPLACE VIEW vw_disponibilidade AS
-SELECT
-  l.id_livro,
-  -- ... (outras colunas)
-  (l.numero_exemplares - COUNT(e.id_emprestimo)) AS disponibilidade
-FROM livros l
-LEFT JOIN emprestimos e
-  ON l.id_livro = e.FK_LIVROS_ID_livro AND e.data_devolucao IS NULL
-GROUP BY l.id_livro;
-
-
-CREATE OR REPLACE VIEW vw_disponibilidade AS
-SELECT
-	l.id_livro,
-    l.titulo,
-    l.numero_exemplares,
-    (l.numero_exemplares - COUNT(e.id_emprestimo)) AS disponibilidade
-FROM
-	livros l
-    LEFT JOIN emprestimos e ON l.id_livro = e.FK_LIVROS_ID_livro AND e.data_devolucao IS NULL
-GROUP BY
-	l.id_livro,
-    l.titulo,
-    l.numero_exemplares;
-
--- 3. CRIAÇÃO DA VW_EMPRESTIMOS_DETALHADOS CORRIGIDA (consistente com FKs longas)
-CREATE OR REPLACE VIEW vw_emprestimos_detalhados AS
-SELECT 
-	e.id_emprestimo,
-    e.data_emprestimo,
-    e.data_prevista,
-    e.data_devolucao,
+    -- e.multa_paga (COLUNA REMOVIDA)
     u.id_usuario,
     u.nome_completo,
     l.id_livro,
@@ -183,5 +162,20 @@ SELECT
     ELSE 'emprestado'
     END AS status_calculado
 FROM emprestimos e
-JOIN usuarios u ON e.FK_USUARIO_ID_usuario = u.id_usuario 
-JOIN livros l ON e.FK_LIVROS_ID_livro = l.id_livro;
+JOIN usuarios u ON e.id_usuario = u.id_usuario
+JOIN livros l ON e.id_livro = l.id_livro;
+
+-- View de Disponibilidade: CORRIGIDA para usar o nome da coluna correto (id_livro)
+CREATE OR REPLACE VIEW vw_disponibilidade AS
+SELECT
+    l.id_livro,
+    l.titulo,
+    l.numero_exemplares,
+    (l.numero_exemplares - COUNT(e.id_emprestimo)) AS disponibilidade
+FROM
+    livros l
+    LEFT JOIN emprestimos e ON l.id_livro = e.id_livro AND e.data_devolucao IS NULL -- CORRIGIDO
+GROUP BY
+    l.id_livro,
+    l.titulo,
+    l.numero_exemplares;
